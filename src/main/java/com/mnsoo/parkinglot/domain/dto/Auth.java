@@ -1,4 +1,4 @@
-package com.mnsoo.parkinglot.domain;
+package com.mnsoo.parkinglot.domain.dto;
 
 import com.mnsoo.parkinglot.domain.persist.UserEntity;
 import lombok.Data;

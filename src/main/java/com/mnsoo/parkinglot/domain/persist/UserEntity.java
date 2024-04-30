@@ -1,5 +1,6 @@
 package com.mnsoo.parkinglot.domain.persist;
 
+import com.mnsoo.parkinglot.domain.BaseEntity;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -16,7 +17,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity(name = "user")
-public class UserEntity implements UserDetails {
+public class UserEntity extends BaseEntity implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
