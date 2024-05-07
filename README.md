@@ -41,7 +41,7 @@
 
 ---
 
-![erd](https://github.com/minsoo0506/public-parking-lot-api/assets/68321360/624164df-8e06-4f4e-9db5-2ca547b8b44c)
+<img width="935" alt="스크린샷 2024-05-07 오후 6 49 05" src="https://github.com/minsoo0506/public-parking-lot-api/assets/68321360/da1e4bcd-857d-4004-a4cc-268a4b9190a8">
 
 
 ### ⚠️ Trouble Shooting
