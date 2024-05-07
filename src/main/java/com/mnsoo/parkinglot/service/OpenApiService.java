@@ -1,11 +1,7 @@
 package com.mnsoo.parkinglot.service;
 
-import com.mnsoo.parkinglot.domain.persist.ParkingFeeEntity;
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
-import com.mnsoo.parkinglot.domain.persist.ParkingOperationEntity;
-import com.mnsoo.parkinglot.repository.ParkingFeeRepository;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
-import com.mnsoo.parkinglot.repository.ParkingOperationRepository;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -18,8 +14,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @Service
 public class OpenApiService {
@@ -27,16 +21,12 @@ public class OpenApiService {
     private String apikey;
 
     private final ParkingLotRepository parkingLotRepository;
-    private final ParkingFeeRepository parkingFeeRepository;
-    private final ParkingOperationRepository parkingOperationRepository;
 
-    public OpenApiService(ParkingLotRepository parkingLotRepository, ParkingFeeRepository parkingFeeRepository, ParkingOperationRepository parkingOperationRepository) {
+    public OpenApiService(ParkingLotRepository parkingLotRepository) {
         this.parkingLotRepository = parkingLotRepository;
-        this.parkingFeeRepository = parkingFeeRepository;
-        this.parkingOperationRepository = parkingOperationRepository;
     }
 
-    //@Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *")
     public void autoSaveParkingLotData(){
         String result = getParkingLotInfo();
         System.out.println(result);
@@ -110,8 +100,6 @@ public class OpenApiService {
                     return false;
                 }
 
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
                 ParkingLotEntity parkingLot = ParkingLotEntity.builder()
                         .parkingCode(Integer.parseInt(parkingCode))
                         .parkingName(tmp.get("PARKING_NAME").toString())
@@ -121,40 +109,7 @@ public class OpenApiService {
                         .lng(Double.parseDouble(tmp.get("LNG").toString()))
                         .build();
 
-                ParkingFeeEntity parkingFee = ParkingFeeEntity
-                        .builder()
-                        .parkingLot(parkingLot)
-                        .fulltimeMonthly(Integer.parseInt(tmp.get("FULLTIME_MONTHLY").toString()))
-                        .rates((int) Double.parseDouble(tmp.get("RATES").toString()))
-                        .timeRate((int) Double.parseDouble(tmp.get("TIME_RATE").toString()))
-                        .addRates((int) Double.parseDouble(tmp.get("ADD_RATES").toString()))
-                        .addTimeRate((int) Double.parseDouble(tmp.get("ADD_TIME_RATE").toString()))
-                        .dayMaximum((int) Double.parseDouble(tmp.get("DAY_MAXIMUM").toString()))
-                        .build();
-
-                LocalDateTime curParkingTime = LocalDateTime.parse(tmp.get("CUR_PARKING_TIME").toString(), formatter);
-
-                ParkingOperationEntity parkingOperation = ParkingOperationEntity
-                        .builder()
-                        .parkingLot(parkingLot)
-                        .operationRule(tmp.get("OPERATION_RULE").toString())
-                        .queStatus(tmp.get("QUE_STATUS").toString())
-                        .capacity((int) Double.parseDouble(tmp.get("CAPACITY").toString()))
-                        .curParking((int) Double.parseDouble(tmp.get("CUR_PARKING").toString()))
-                        .curParkingTime(curParkingTime)
-                        .weekdayBeginTime(tmp.get("WEEKDAY_BEGIN_TIME").toString())
-                        .weekdayEndTime(tmp.get("WEEKDAY_END_TIME").toString())
-                        .weekendBeginTime(tmp.get("WEEKEND_BEGIN_TIME").toString())
-                        .weekendEndTime(tmp.get("WEEKEND_END_TIME").toString())
-                        .holidayBeginTime(tmp.get("HOLIDAY_BEGIN_TIME").toString())
-                        .holidayEndTime(tmp.get("HOLIDAY_END_TIME").toString())
-                        .saturdayPayYN(tmp.get("SATURDAY_PAY_YN").toString())
-                        .holidayPayYN(tmp.get("HOLIDAY_PAY_YN").toString())
-                        .build();
-
                 parkingLotRepository.save(parkingLot);
-                parkingFeeRepository.save(parkingFee);
-                parkingOperationRepository.save(parkingOperation);
             }
             return true;
         } catch (org.json.simple.parser.ParseException e) {

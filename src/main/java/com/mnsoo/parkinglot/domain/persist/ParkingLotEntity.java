@@ -16,10 +16,10 @@ public class ParkingLotEntity extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private int parkingCode; // 주차장 코드
 
-    @Column
+    @Column(nullable = false)
     private String parkingName; // 주차장 명
 
     @Column
