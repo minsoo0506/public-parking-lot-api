@@ -41,7 +41,7 @@
 
 ---
 
-![다운로드 (1)](https://github.com/minsoo0506/public-parking-lot-api/assets/68321360/40b8c873-0d76-4710-9265-501b7c8e0d21)
+<img width="977" alt="스크린샷 2024-05-09 오후 11 09 16" src="https://github.com/minsoo0506/Weather-Diary/assets/68321360/afa8f3c5-fdba-4943-a52d-01265972501b">
 
 
 ### ⚠️ Trouble Shooting
