@@ -2,6 +2,7 @@ package com.mnsoo.parkinglot.service;
 
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
+import io.swagger.models.auth.In;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 
 @Service
 public class OpenApiService {
@@ -28,14 +30,16 @@ public class OpenApiService {
 
     @Scheduled(cron = "0 0 3 * * *")
     public void autoSaveParkingLotData(){
-        String result = getParkingLotInfo();
-        System.out.println(result);
+        String result = getAllParkingLot(true);
+        if(result != null){
+            System.out.println("data updated successfully");
+        }
     }
 
-    public String getParkingLotInfo() {
+    public String getAllParkingLot(boolean isUpdate) {
         int startIndex = 1;
         int endIndex = 1000;  // API가 한 번에 반환할 수 있는 최대 결과 수
-        StringBuilder totalResponse = new StringBuilder();
+        JSONArray totalResponse = new JSONArray();
 
         while (true) {
             String apiUrl = "http://openapi.seoul.go.kr:8088/"
@@ -46,10 +50,14 @@ public class OpenApiService {
 
             try {
                 String result = getApiResponse(apiUrl);
-                if (!processApiResponse(result)) {
+                JSONParser jsonParser = new JSONParser();
+                JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
+                JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
+                JSONArray infoArr = (JSONArray) parkingInfo.get("row");
+                totalResponse.addAll(infoArr);
+                if (!processApiResponse(result, isUpdate)) {
                     break;
                 }
-                totalResponse.append(result);
                 startIndex = endIndex + 1;
                 endIndex += 1000;
             } catch (Exception e) {
@@ -77,20 +85,16 @@ public class OpenApiService {
         return result;
     }
 
-    private boolean processApiResponse(String result) {
+    private boolean processApiResponse(String result, boolean isUpdate) {
         try {
             JSONParser jsonParser = new JSONParser();
             JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
             JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
-            Long totalCount = (Long) parkingInfo.get("list_total_count");
 
             JSONObject subResult = (JSONObject) parkingInfo.get("RESULT");
             JSONArray infoArr = (JSONArray) parkingInfo.get("row");
 
             System.out.println(subResult);
-            System.out.println("불러온 데이터의 개수 : " + totalCount);
-
-            System.out.println(infoArr.size());
 
             for (int i = 0; i < infoArr.size(); i++) {
                 JSONObject tmp = (JSONObject) infoArr.get(i);
@@ -100,20 +104,54 @@ public class OpenApiService {
                     return false;
                 }
 
-                ParkingLotEntity parkingLot = ParkingLotEntity.builder()
-                        .parkingCode(Integer.parseInt(parkingCode))
-                        .parkingName(tmp.get("PARKING_NAME").toString())
-                        .address(tmp.get("ADDR").toString())
-                        .tel(tmp.get("TEL").toString())
-                        .lat(Double.parseDouble(tmp.get("LAT").toString()))
-                        .lng(Double.parseDouble(tmp.get("LNG").toString()))
-                        .build();
+                if (isUpdate) {
+                    ParkingLotEntity parkingLot = parkingLotRepository.findByParkingCode(Integer.parseInt(parkingCode));
+                    if (parkingLot == null) {
+                        parkingLot = ParkingLotEntity.builder()
+                                .parkingCode(Integer.parseInt(parkingCode))
+                                .build();
+                    }
 
-                parkingLotRepository.save(parkingLot);
+                    parkingLot.setParkingName(tmp.get("PARKING_NAME").toString());
+                    parkingLot.setAddress(tmp.get("ADDR").toString());
+                    parkingLot.setTel(tmp.get("TEL").toString());
+                    parkingLot.setLat(Double.parseDouble(tmp.get("LAT").toString()));
+                    parkingLot.setLng(Double.parseDouble(tmp.get("LNG").toString()));
+
+                    parkingLotRepository.save(parkingLot);
+                }
             }
             return true;
         } catch (org.json.simple.parser.ParseException e) {
             throw new RuntimeException(e);
         }
+    }
+    public List<ParkingLotEntity> searchParkingLots(String query){
+        return parkingLotRepository.findByParkingNameContaining(query);
+    }
+
+    public Object searchSpecifically(String code) {
+        String allParkingLotData = getAllParkingLot(false);
+        JSONParser jsonParser = new JSONParser();
+        JSONArray jsonArray = null;
+        try {
+            jsonArray = (JSONArray) jsonParser.parse(allParkingLotData);
+        } catch (org.json.simple.parser.ParseException e) {
+            throw new RuntimeException(e);
+        }
+
+        for (int i = 0; i < jsonArray.size(); i++) {
+            Object item = jsonArray.get(i);
+            if (!(item instanceof JSONObject)) {
+                throw new IllegalArgumentException("Array item is not a JSONObject: " + item);
+            }
+            JSONObject object = (JSONObject) item;
+            String parkingCode = object.get("PARKING_CODE").toString().trim();
+            if (parkingCode.equals(code)) {
+                return object;
+            }
+        }
+
+        return "No data found for parking code: " + code;
     }
 }
