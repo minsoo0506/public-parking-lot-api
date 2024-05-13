@@ -2,6 +2,7 @@ package com.mnsoo.parkinglot.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mnsoo.parkinglot.distance.DistanceCalculator;
 import com.mnsoo.parkinglot.domain.dto.ParkingLotDTO;
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class OpenApiService {
@@ -136,5 +138,15 @@ public class OpenApiService {
         }
 
         return null;
+    }
+
+    public List<ParkingLotEntity> searchNearbyParkingLots(double userLat, double userLng, double radius){
+        List<ParkingLotEntity> allParkingLots = parkingLotRepository.findAll();
+
+        return allParkingLots.stream()
+                .filter(parkingLot -> DistanceCalculator
+                        // [radius]km 이내의 주차장만 필터링
+                        .calculateDistance(userLat, userLng, parkingLot.getLat(), parkingLot.getLng()) <= radius)
+                .collect(Collectors.toList());
     }
 }

@@ -30,4 +30,14 @@ public class OpenApiController {
 
         return ResponseEntity.ok(result);
     }
+
+    @GetMapping("/search/nearby")
+    ResponseEntity<?> searchNearbyParkingLots(
+            @RequestParam(defaultValue = "37.498071922037155") Double userLat,
+            @RequestParam(defaultValue = "127.02799461568996") Double userLng,
+            @RequestParam(defaultValue = "5.0") Double radius
+    ){
+        var result = openApiService.searchNearbyParkingLots(userLat, userLng, radius);
+        return ResponseEntity.ok(result);
+    }
 }
