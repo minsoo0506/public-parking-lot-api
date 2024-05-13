@@ -1,20 +1,20 @@
 package com.mnsoo.parkinglot.service;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mnsoo.parkinglot.domain.dto.ParkingLotDTO;
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
-import io.swagger.models.auth.In;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -30,17 +30,18 @@ public class OpenApiService {
 
     @Scheduled(cron = "0 0 3 * * *")
     public void autoSaveParkingLotData(){
-        String result = getAllParkingLot(true);
+        var result = getAllParkingLot(true);
         if(result != null){
             System.out.println("data updated successfully");
         }
     }
 
-    public String getAllParkingLot(boolean isUpdate) {
+    public List<ParkingLotDTO> getAllParkingLot(boolean isUpdate) {
         int startIndex = 1;
         int endIndex = 1000;  // API가 한 번에 반환할 수 있는 최대 결과 수
-        JSONArray totalResponse = new JSONArray();
+        List<ParkingLotDTO> totalResponse = new ArrayList<>();
 
+        boolean isEndOfData = false;
         while (true) {
             String apiUrl = "http://openapi.seoul.go.kr:8088/"
                     + apikey
@@ -49,109 +50,91 @@ public class OpenApiService {
                     + endIndex + "/";
 
             try {
+                List<ParkingLotDTO> tmp = new ArrayList<>();
                 String result = getApiResponse(apiUrl);
                 JSONParser jsonParser = new JSONParser();
                 JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
                 JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
                 JSONArray infoArr = (JSONArray) parkingInfo.get("row");
-                totalResponse.addAll(infoArr);
-                if (!processApiResponse(result, isUpdate)) {
-                    break;
-                }
-                startIndex = endIndex + 1;
-                endIndex += 1000;
-            } catch (Exception e) {
-                return "failed to get response";
-            }
-        }
-
-        return totalResponse.toString();
-    }
-
-    private String getApiResponse(String apiUrl) throws IOException {
-        URL url = new URL(apiUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        int responseCode = connection.getResponseCode();
-        BufferedReader br;
-        if(responseCode == 200){
-            br = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
-        } else {
-            br = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-        }
-        String result = br.readLine();
-        br.close();
-
-        return result;
-    }
-
-    private boolean processApiResponse(String result, boolean isUpdate) {
-        try {
-            JSONParser jsonParser = new JSONParser();
-            JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
-            JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
-
-            JSONObject subResult = (JSONObject) parkingInfo.get("RESULT");
-            JSONArray infoArr = (JSONArray) parkingInfo.get("row");
-
-            System.out.println(subResult);
-
-            for (int i = 0; i < infoArr.size(); i++) {
-                JSONObject tmp = (JSONObject) infoArr.get(i);
-
-                String parkingCode = tmp.get("PARKING_CODE").toString();
-                if (parkingCode == null || parkingCode.equals("")) {
-                    return false;
+                for (Object item : infoArr) {
+                    JSONObject object = (JSONObject) item;
+                    String parkingCode = object.get("PARKING_CODE").toString().trim();
+                    if(parkingCode.isEmpty()){
+                        isEndOfData = true;
+                        break;
+                    }
+                    ParkingLotDTO parkingLot = createParkingLotDTO(object);
+                    tmp.add(parkingLot);
                 }
 
                 if (isUpdate) {
-                    ParkingLotEntity parkingLot = parkingLotRepository.findByParkingCode(Integer.parseInt(parkingCode));
-                    if (parkingLot == null) {
-                        parkingLot = ParkingLotEntity.builder()
-                                .parkingCode(Integer.parseInt(parkingCode))
-                                .build();
-                    }
-
-                    parkingLot.setParkingName(tmp.get("PARKING_NAME").toString());
-                    parkingLot.setAddress(tmp.get("ADDR").toString());
-                    parkingLot.setTel(tmp.get("TEL").toString());
-                    parkingLot.setLat(Double.parseDouble(tmp.get("LAT").toString()));
-                    parkingLot.setLng(Double.parseDouble(tmp.get("LNG").toString()));
-
-                    parkingLotRepository.save(parkingLot);
+                    processApiResponse(tmp);
                 }
+
+                totalResponse.addAll(tmp);
+                if(isEndOfData) break;
+                startIndex = endIndex + 1;
+                endIndex += 1000;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to get response", e);
             }
-            return true;
-        } catch (org.json.simple.parser.ParseException e) {
+        }
+
+        return totalResponse;
+    }
+
+    private String getApiResponse(String apiUrl) {
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
+        return response.getBody();
+    }
+
+    private void processApiResponse(List<ParkingLotDTO> parkingLots) {
+        try {
+            for (ParkingLotDTO parkingLotDTO : parkingLots) {
+                ParkingLotEntity parkingLot = parkingLotRepository.findByParkingCode(parkingLotDTO.getParkingCode());
+                if (parkingLot == null) {
+                    parkingLot = ParkingLotEntity.builder()
+                            .parkingCode(parkingLotDTO.getParkingCode())
+                            .build();
+                }
+
+                parkingLot.setParkingName(parkingLotDTO.getParkingName());
+                parkingLot.setAddress(parkingLotDTO.getAddress());
+                parkingLot.setTel(parkingLotDTO.getTel());
+                parkingLot.setLat(parkingLotDTO.getLat());
+                parkingLot.setLng(parkingLotDTO.getLng());
+
+                parkingLotRepository.save(parkingLot);
+            }
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
+    private ParkingLotDTO createParkingLotDTO(JSONObject object) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+        mapper.enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ParkingLotDTO parkingLotDTO = mapper.convertValue(object, ParkingLotDTO.class);
+        return parkingLotDTO;
+    }
+
     public List<ParkingLotEntity> searchParkingLots(String query){
         return parkingLotRepository.findByParkingNameContaining(query);
     }
 
-    public Object searchSpecifically(String code) {
-        String allParkingLotData = getAllParkingLot(false);
-        JSONParser jsonParser = new JSONParser();
-        JSONArray jsonArray = null;
-        try {
-            jsonArray = (JSONArray) jsonParser.parse(allParkingLotData);
-        } catch (org.json.simple.parser.ParseException e) {
-            throw new RuntimeException(e);
-        }
+    public ParkingLotDTO searchSpecifically(String code) {
+        List<ParkingLotDTO> allParkingLotData = getAllParkingLot(false);
 
-        for (int i = 0; i < jsonArray.size(); i++) {
-            Object item = jsonArray.get(i);
-            if (!(item instanceof JSONObject)) {
-                throw new IllegalArgumentException("Array item is not a JSONObject: " + item);
-            }
-            JSONObject object = (JSONObject) item;
-            String parkingCode = object.get("PARKING_CODE").toString().trim();
+        for (ParkingLotDTO parkingLot : allParkingLotData) {
+            String parkingCode = String.valueOf(parkingLot.getParkingCode()).trim();
             if (parkingCode.equals(code)) {
-                return object;
+                return parkingLot;
             }
         }
 
-        return "No data found for parking code: " + code;
+        return null;
     }
 }

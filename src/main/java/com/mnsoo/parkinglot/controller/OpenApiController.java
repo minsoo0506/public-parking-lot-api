@@ -23,6 +23,11 @@ public class OpenApiController {
     @GetMapping("/search/specific/{code}")
     ResponseEntity<?> searchSpecifically(@PathVariable String code){
         var result = openApiService.searchSpecifically(code);
+
+        if(result == null){
+            return ResponseEntity.ok("No data found for parking code: " + code);
+        }
+
         return ResponseEntity.ok(result);
     }
 }
