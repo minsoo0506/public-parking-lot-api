@@ -1,19 +1,21 @@
 package com.mnsoo.parkinglot.service;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mnsoo.parkinglot.domain.dto.ParkingLotDTO;
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class OpenApiService {
@@ -28,15 +30,18 @@ public class OpenApiService {
 
     @Scheduled(cron = "0 0 3 * * *")
     public void autoSaveParkingLotData(){
-        String result = getParkingLotInfo();
-        System.out.println(result);
+        var result = getAllParkingLot(true);
+        if(result != null){
+            System.out.println("data updated successfully");
+        }
     }
 
-    public String getParkingLotInfo() {
+    public List<ParkingLotDTO> getAllParkingLot(boolean isUpdate) {
         int startIndex = 1;
         int endIndex = 1000;  // API가 한 번에 반환할 수 있는 최대 결과 수
-        StringBuilder totalResponse = new StringBuilder();
+        List<ParkingLotDTO> totalResponse = new ArrayList<>();
 
+        boolean isEndOfData = false;
         while (true) {
             String apiUrl = "http://openapi.seoul.go.kr:8088/"
                     + apikey
@@ -45,75 +50,91 @@ public class OpenApiService {
                     + endIndex + "/";
 
             try {
+                List<ParkingLotDTO> tmp = new ArrayList<>();
                 String result = getApiResponse(apiUrl);
-                if (!processApiResponse(result)) {
-                    break;
+                JSONParser jsonParser = new JSONParser();
+                JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
+                JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
+                JSONArray infoArr = (JSONArray) parkingInfo.get("row");
+                for (Object item : infoArr) {
+                    JSONObject object = (JSONObject) item;
+                    String parkingCode = object.get("PARKING_CODE").toString().trim();
+                    if(parkingCode.isEmpty()){
+                        isEndOfData = true;
+                        break;
+                    }
+                    ParkingLotDTO parkingLot = createParkingLotDTO(object);
+                    tmp.add(parkingLot);
                 }
-                totalResponse.append(result);
+
+                if (isUpdate) {
+                    processApiResponse(tmp);
+                }
+
+                totalResponse.addAll(tmp);
+                if(isEndOfData) break;
                 startIndex = endIndex + 1;
                 endIndex += 1000;
             } catch (Exception e) {
-                return "failed to get response";
+                throw new RuntimeException("Failed to get response", e);
             }
         }
 
-        return totalResponse.toString();
+        return totalResponse;
     }
 
-    private String getApiResponse(String apiUrl) throws IOException {
-        URL url = new URL(apiUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        int responseCode = connection.getResponseCode();
-        BufferedReader br;
-        if(responseCode == 200){
-            br = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
-        } else {
-            br = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-        }
-        String result = br.readLine();
-        br.close();
-
-        return result;
+    private String getApiResponse(String apiUrl) {
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
+        return response.getBody();
     }
 
-    private boolean processApiResponse(String result) {
+    private void processApiResponse(List<ParkingLotDTO> parkingLots) {
         try {
-            JSONParser jsonParser = new JSONParser();
-            JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
-            JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
-            Long totalCount = (Long) parkingInfo.get("list_total_count");
-
-            JSONObject subResult = (JSONObject) parkingInfo.get("RESULT");
-            JSONArray infoArr = (JSONArray) parkingInfo.get("row");
-
-            System.out.println(subResult);
-            System.out.println("불러온 데이터의 개수 : " + totalCount);
-
-            System.out.println(infoArr.size());
-
-            for (int i = 0; i < infoArr.size(); i++) {
-                JSONObject tmp = (JSONObject) infoArr.get(i);
-
-                String parkingCode = tmp.get("PARKING_CODE").toString();
-                if (parkingCode == null || parkingCode.equals("")) {
-                    return false;
+            for (ParkingLotDTO parkingLotDTO : parkingLots) {
+                ParkingLotEntity parkingLot = parkingLotRepository.findByParkingCode(parkingLotDTO.getParkingCode());
+                if (parkingLot == null) {
+                    parkingLot = ParkingLotEntity.builder()
+                            .parkingCode(parkingLotDTO.getParkingCode())
+                            .build();
                 }
 
-                ParkingLotEntity parkingLot = ParkingLotEntity.builder()
-                        .parkingCode(Integer.parseInt(parkingCode))
-                        .parkingName(tmp.get("PARKING_NAME").toString())
-                        .address(tmp.get("ADDR").toString())
-                        .tel(tmp.get("TEL").toString())
-                        .lat(Double.parseDouble(tmp.get("LAT").toString()))
-                        .lng(Double.parseDouble(tmp.get("LNG").toString()))
-                        .build();
+                parkingLot.setParkingName(parkingLotDTO.getParkingName());
+                parkingLot.setAddress(parkingLotDTO.getAddress());
+                parkingLot.setTel(parkingLotDTO.getTel());
+                parkingLot.setLat(parkingLotDTO.getLat());
+                parkingLot.setLng(parkingLotDTO.getLng());
 
                 parkingLotRepository.save(parkingLot);
             }
-            return true;
-        } catch (org.json.simple.parser.ParseException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private ParkingLotDTO createParkingLotDTO(JSONObject object) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+        mapper.enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        ParkingLotDTO parkingLotDTO = mapper.convertValue(object, ParkingLotDTO.class);
+        return parkingLotDTO;
+    }
+
+    public List<ParkingLotEntity> searchParkingLots(String query){
+        return parkingLotRepository.findByParkingNameContaining(query);
+    }
+
+    public ParkingLotDTO searchSpecifically(String code) {
+        List<ParkingLotDTO> allParkingLotData = getAllParkingLot(false);
+
+        for (ParkingLotDTO parkingLot : allParkingLotData) {
+            String parkingCode = String.valueOf(parkingLot.getParkingCode()).trim();
+            if (parkingCode.equals(code)) {
+                return parkingLot;
+            }
+        }
+
+        return null;
     }
 }
