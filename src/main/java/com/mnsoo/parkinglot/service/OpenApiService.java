@@ -2,7 +2,6 @@ package com.mnsoo.parkinglot.service;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mnsoo.parkinglot.distance.DistanceCalculator;
 import com.mnsoo.parkinglot.domain.dto.ParkingLotDTO;
 import com.mnsoo.parkinglot.domain.persist.ParkingLotEntity;
 import com.mnsoo.parkinglot.repository.ParkingLotRepository;
@@ -10,6 +9,9 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Service
 public class OpenApiService {
@@ -33,7 +35,7 @@ public class OpenApiService {
     @Scheduled(cron = "0 0 3 * * *")
     public void autoSaveParkingLotData(){
         var result = getAllParkingLot(true);
-        if(result != null){
+        if(!result.isEmpty()){
             System.out.println("data updated successfully");
         }
     }
@@ -58,15 +60,22 @@ public class OpenApiService {
                 JSONObject jsonObject = (JSONObject) jsonParser.parse(result);
                 JSONObject parkingInfo = (JSONObject) jsonObject.get("GetParkingInfo");
                 JSONArray infoArr = (JSONArray) parkingInfo.get("row");
+
                 for (Object item : infoArr) {
                     JSONObject object = (JSONObject) item;
                     String parkingCode = object.get("PARKING_CODE").toString().trim();
+
                     if(parkingCode.isEmpty()){
                         isEndOfData = true;
                         break;
                     }
+
                     ParkingLotDTO parkingLot = createParkingLotDTO(object);
-                    tmp.add(parkingLot);
+                    if (parkingLot != null) {
+                        tmp.add(parkingLot);
+                    } else {
+                        System.err.println("Failed to convert JSONObject to ParkingLotDTO: " + object.toJSONString());
+                    }
                 }
 
                 if (isUpdate) {
@@ -81,7 +90,6 @@ public class OpenApiService {
                 throw new RuntimeException("Failed to get response", e);
             }
         }
-
         return totalResponse;
     }
 
@@ -91,17 +99,16 @@ public class OpenApiService {
         return response.getBody();
     }
 
-    private void processApiResponse(List<ParkingLotDTO> parkingLots) {
+    public void processApiResponse(List<ParkingLotDTO> parkingLots) {
         try {
             for (ParkingLotDTO parkingLotDTO : parkingLots) {
-                ParkingLotEntity parkingLot = parkingLotRepository.findByParkingCode(parkingLotDTO.getParkingCode());
-                if (parkingLot == null) {
-                    parkingLot = ParkingLotEntity.builder()
-                            .parkingCode(parkingLotDTO.getParkingCode())
-                            .build();
-                }
+                Optional<ParkingLotEntity> optionalParkingLot = parkingLotRepository.findByParkingCode(parkingLotDTO.getParkingCode());
+                ParkingLotEntity parkingLot;
+                parkingLot = optionalParkingLot.orElseGet(() -> ParkingLotEntity.builder()
+                        .parkingCode(parkingLotDTO.getParkingCode())
+                        .parkingName(parkingLotDTO.getParkingName())
+                        .build());
 
-                parkingLot.setParkingName(parkingLotDTO.getParkingName());
                 parkingLot.setAddress(parkingLotDTO.getAddress());
                 parkingLot.setTel(parkingLotDTO.getTel());
                 parkingLot.setLat(parkingLotDTO.getLat());
@@ -119,8 +126,13 @@ public class OpenApiService {
         mapper.enable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
         mapper.enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        ParkingLotDTO parkingLotDTO = mapper.convertValue(object, ParkingLotDTO.class);
-        return parkingLotDTO;
+        try {
+            ParkingLotDTO parkingLotDTO = mapper.convertValue(object, ParkingLotDTO.class);
+            return parkingLotDTO;
+        } catch (Exception e) {
+            System.err.println("Error converting JSONObject to ParkingLotDTO: " + e.getMessage());
+            return null;
+        }
     }
 
     public List<ParkingLotEntity> searchParkingLots(String query){
@@ -140,13 +152,10 @@ public class OpenApiService {
         return null;
     }
 
-    public List<ParkingLotEntity> searchNearbyParkingLots(double userLat, double userLng, double radius){
-        List<ParkingLotEntity> allParkingLots = parkingLotRepository.findAll();
+    public Page<ParkingLotEntity> searchNearbyParkingLots(int page, int size, double userLat, double userLng, int radius){
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ParkingLotEntity> nearbyParkingLots = parkingLotRepository.findNearbyParkingLots(userLat, userLng, radius, pageable);
 
-        return allParkingLots.stream()
-                .filter(parkingLot -> DistanceCalculator
-                        // [radius]km 이내의 주차장만 필터링
-                        .calculateDistance(userLat, userLng, parkingLot.getLat(), parkingLot.getLng()) <= radius)
-                .collect(Collectors.toList());
+        return nearbyParkingLots;
     }
 }

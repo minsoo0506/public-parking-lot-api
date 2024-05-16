@@ -1,6 +1,7 @@
 package com.mnsoo.parkinglot.domain.persist;
 import com.mnsoo.parkinglot.domain.BaseEntity;
 import lombok.*;
+import org.springframework.data.domain.Persistable;
 
 import javax.persistence.*;
 
