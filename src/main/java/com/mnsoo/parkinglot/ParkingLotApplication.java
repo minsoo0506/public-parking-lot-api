@@ -11,7 +11,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ParkingLotApplication {
 	// 토
-	// 가까운 주차장 찾기
 	// 리뷰 기능 추가
 
 	// 일
