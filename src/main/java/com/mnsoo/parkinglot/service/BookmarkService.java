@@ -29,8 +29,9 @@ public class BookmarkService {
     }
 
     public void addBookmark(String parkingCode){
-        var parkingLot = this.parkingLotRepository.findByParkingCode(Integer.parseInt(parkingCode)).get();
-        if(parkingLot == null) throw new ParkingLotNotFoundException();
+        var parkingLot = this.parkingLotRepository.findByParkingCode(Integer.parseInt(parkingCode))
+                .orElseThrow(ParkingLotNotFoundException::new);
+
 
         UserEntity user = getCurrentUser();
 

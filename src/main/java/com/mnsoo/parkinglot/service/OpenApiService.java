@@ -8,6 +8,8 @@ import com.mnsoo.parkinglot.repository.ParkingLotRepository;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +25,9 @@ import java.util.Optional;
 
 @Service
 public class OpenApiService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OpenApiService.class);
+
     @Value("${openapi.key}")
     private String apikey;
 
@@ -36,7 +41,7 @@ public class OpenApiService {
     public void autoSaveParkingLotData(){
         var result = getAllParkingLot(true);
         if(!result.isEmpty()){
-            System.out.println("data updated successfully");
+            logger.info("Data updated successfully");
         }
     }
 
@@ -74,7 +79,7 @@ public class OpenApiService {
                     if (parkingLot != null) {
                         tmp.add(parkingLot);
                     } else {
-                        System.err.println("Failed to convert JSONObject to ParkingLotDTO: " + object.toJSONString());
+                        logger.error("Failed to convert JSONObject to ParkingLotDTO: {}", object.toJSONString());
                     }
                 }
 
@@ -87,9 +92,11 @@ public class OpenApiService {
                 startIndex = endIndex + 1;
                 endIndex += 1000;
             } catch (Exception e) {
+                logger.error("Failed to get response", e);
                 throw new RuntimeException("Failed to get response", e);
             }
         }
+        logger.info("Retrieved {} parking lots", totalResponse.size());
         return totalResponse;
     }
 
@@ -117,6 +124,7 @@ public class OpenApiService {
                 parkingLotRepository.save(parkingLot);
             }
         } catch (Exception e) {
+            logger.error("Error processing API response", e);
             throw new RuntimeException(e);
         }
     }
@@ -130,7 +138,7 @@ public class OpenApiService {
             ParkingLotDTO parkingLotDTO = mapper.convertValue(object, ParkingLotDTO.class);
             return parkingLotDTO;
         } catch (Exception e) {
-            System.err.println("Error converting JSONObject to ParkingLotDTO: " + e.getMessage());
+            logger.error("Error converting JSONObject to ParkingLotDTO", e);
             return null;
         }
     }
