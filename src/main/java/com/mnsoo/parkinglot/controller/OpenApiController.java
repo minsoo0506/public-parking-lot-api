@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class OpenApiController {
+
     private final OpenApiService openApiService;
 
     @PreAuthorize("hasRole('ADMIN')")
