@@ -45,6 +45,9 @@ dependencies {
 	runtimeOnly 'mysql:mysql-connector-java:8.0.32'
 }
 
+jar {
+	enabled = false
+}
 /*
 tasks.named('test') {
 	useJUnitPlatform()
