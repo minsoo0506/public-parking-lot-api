@@ -9,6 +9,12 @@ application {
 	mainClass.set('com.mnsoo.parkinglot.ParkingLotApplication')
 }
 
+jar {
+	manifest {
+		attributes 'Main-Class':'com.mnsoo.parkinglot.ParkingLotApplication'
+	}
+}
+
 group = 'com.mnsoo'
 version = '0.0.1-SNAPSHOT'
 
