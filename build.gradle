@@ -5,11 +5,11 @@ plugins {
 	id 'application'
 }
 
-/*
+
 application {
 	mainClass.set('com.mnsoo.parkinglot.ParkingLotApplication')
 }
- */
+
 
 jar {
 	manifest {
@@ -58,7 +58,9 @@ dependencies {
 	runtimeOnly 'mysql:mysql-connector-java:8.0.32'
 }
 
+/*
 tasks.named('test') {
 	useJUnitPlatform()
 }
+ */
 
