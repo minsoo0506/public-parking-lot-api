@@ -1,6 +1,5 @@
 package com.mnsoo.parkinglot.service;
 
-import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -26,7 +25,7 @@ import java.util.UUID;
 @Service
 public class ReviewService {
 
-    private AmazonS3Client amazonS3Client;
+    private final AmazonS3Client amazonS3Client;
 
     private final ReviewRepository reviewRepository;
     private final ParkingLotRepository parkingLotRepository;
