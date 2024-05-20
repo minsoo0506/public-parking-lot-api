@@ -10,6 +10,10 @@ application {
 	mainClass.set('com.mnsoo.parkinglot.ParkingLotApplication')
 }
 
+bootJar {
+	enabled = true
+}
+
 
 jar {
 	manifest {
