@@ -45,6 +45,12 @@
 
 <img width="977" alt="스크린샷 2024-05-09 오후 11 09 16" src="https://github.com/minsoo0506/Weather-Diary/assets/68321360/afa8f3c5-fdba-4943-a52d-01265972501b">
 
+### 📜 API DOC : SWAGGER
+
+---
+
+http://13.209.40.105:8080/swagger-ui.html
+
 
 ### ⚠️ Trouble Shooting
 
