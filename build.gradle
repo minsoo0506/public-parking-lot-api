@@ -2,6 +2,11 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '2.6.4'
 	id 'io.spring.dependency-management' version '1.1.4'
+	id 'application'
+}
+
+application {
+	mainClass.set('com.mnsoo.parkinglot.ParkingLotApplication')
 }
 
 group = 'com.mnsoo'
@@ -43,10 +48,6 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	runtimeOnly 'com.h2database:h2:1.4.200'
 	runtimeOnly 'mysql:mysql-connector-java:8.0.32'
-}
-
-jar {
-	enabled = false
 }
 /*
 tasks.named('test') {
