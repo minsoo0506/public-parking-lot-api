@@ -1,14 +1,14 @@
 spring:
   jwt:
-    secret: 487f33dd19df416c8f8b667fc26cfa0a43ca1f01695636f8e4305e0b9897958c31a24011ea1c324aac3844d7cbb43792dbcfcd2e5328f3accdd9e586b513092d
+    secret: {secret}
 
 
 cloud:
   aws:
     s3:
-      bucket: review-img-bucket
+      bucket: {review-img-bucket}
     stack.auto: false
     region.static: ap-northeast-2
     credentials:
-      accessKey: AKIAWYOGZTYGUR6YLFT6
-      secretKey: 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
+      accessKey: {accessKey}
+      secretKey: {secretKey}
