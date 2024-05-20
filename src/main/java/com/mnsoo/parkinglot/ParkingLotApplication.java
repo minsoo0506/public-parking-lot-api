@@ -10,11 +10,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableJpaAuditing
 @EnableScheduling
 public class ParkingLotApplication {
-	// 토
-	// 리뷰 기능 추가
-
-	// 일
-	// logger, swagger 적용
 
 	public static void main(String[] args) {
 		SpringApplication.run(ParkingLotApplication.class, args);

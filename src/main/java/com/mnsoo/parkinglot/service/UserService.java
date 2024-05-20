@@ -7,6 +7,8 @@ import com.mnsoo.parkinglot.exception.impl.PasswordDoNotMatchException;
 import com.mnsoo.parkinglot.exception.impl.UserAlreadyExistsException;
 import com.mnsoo.parkinglot.repository.UserRepository;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -20,16 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UserService implements UserDetailsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
 
     @Override
     public UserDetails loadUserByUsername(String loginId) throws UsernameNotFoundException {
+        logger.info("Loading user by username: {}", loginId);
         return this.userRepository.findByLoginId(loginId)
                 .orElseThrow(LoginIdNotFoundException::new);
     }
 
     public UserEntity authenticate(Auth.SignIn request){
+        logger.info("Authenticating user: {}", request.getLoginId());
         var user = this.userRepository.findByLoginId(request.getLoginId())
                 .orElseThrow(LoginIdNotFoundException::new);
 
@@ -41,12 +47,16 @@ public class UserService implements UserDetailsService {
     }
 
     public UserEntity getCurrentUser(){
-        return (UserEntity) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserEntity user = (UserEntity) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        logger.info("Getting current user: {}", user.getLoginId());
+        return user;
     }
 
     public UserEntity register(Auth.SignUp user){
+        logger.info("Registering user: {}", user.getLoginId());
         boolean exists = this.userRepository.existsByLoginId(user.getLoginId());
         if(exists){
+            logger.warn("User already exists: {}", user.getLoginId());
             throw new UserAlreadyExistsException();
         }
 
@@ -56,6 +66,7 @@ public class UserService implements UserDetailsService {
     }
 
     public UserEntity updateAccount(Auth.SignUp user){
+        logger.info("Updating account for user: {}", user.getLoginId());
         UserEntity currentUser = getCurrentUser();
 
         if(user.getLoginId() != null){
@@ -78,6 +89,7 @@ public class UserService implements UserDetailsService {
 
     public String deleteAccount(){
         UserEntity currentUser = getCurrentUser();
+        logger.info("Deleting account for user: {}", currentUser.getLoginId());
         userRepository.delete(currentUser);
         return "Account deleted successfully";
     }

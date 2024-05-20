@@ -1,3 +1,6 @@
 spring:
   jwt:
     secret: 487f33dd19df416c8f8b667fc26cfa0a43ca1f01695636f8e4305e0b9897958c31a24011ea1c324aac3844d7cbb43792dbcfcd2e5328f3accdd9e586b513092d
+
+image:
+  path: "/src/main/resources/static/images/"
